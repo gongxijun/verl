@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from verl.utils.device import is_torch_gcu_available
+
 from .base import (
     CheckpointEngine,
     CheckpointEngineManager,
@@ -31,17 +33,30 @@ __all__ = [
 ]
 
 # Every engine below is optional: it carries its own transport dependency, and
-# the CUDA / NPU engines are mutually exclusive by construction (hccl registers
-# the "nccl" backend name on Ascend). Failures are recorded so that asking for a
+# the vendor engines are mutually exclusive by construction (nccl, hccl and eccl
+# all register the "nccl" backend name, and each checks for the presence of its
+# own accelerator before importing). Failures are recorded so that asking for a
 # backend whose module did not import reports the missing dependency instead of
 # just "not registered".
-try:
-    from .nccl_checkpoint_engine import NCCLCheckpointEngine
-
-    __all__ += ["NCCLCheckpointEngine"]
-except ImportError as e:
-    CheckpointEngineRegistry.record_import_error("nccl_checkpoint_engine", e)
+#
+# The NCCL engine is skipped here rather than guarding itself, so that no
+# vendor-neutral engine has to know about a specific accelerator, and so that its
+# CUDA-only cupy dependency is never imported on a GCU host. Skipping it is safe
+# because the ECCL engine registers the same "nccl" backend name below.
+if is_torch_gcu_available():
+    CheckpointEngineRegistry.record_import_error(
+        "nccl_checkpoint_engine",
+        ImportError("NCCLCheckpointEngine is unavailable on Enflame GCU; the eccl engine provides the nccl backend."),
+    )
     NCCLCheckpointEngine = None
+else:
+    try:
+        from .nccl_checkpoint_engine import NCCLCheckpointEngine
+
+        __all__ += ["NCCLCheckpointEngine"]
+    except ImportError as e:
+        CheckpointEngineRegistry.record_import_error("nccl_checkpoint_engine", e)
+        NCCLCheckpointEngine = None
 
 try:
     from .hccl_checkpoint_engine import HCCLCheckpointEngine
@@ -50,6 +65,14 @@ try:
 except ImportError as e:
     CheckpointEngineRegistry.record_import_error("hccl_checkpoint_engine", e)
     HCCLCheckpointEngine = None
+
+try:
+    from .eccl_checkpoint_engine import ECCLCheckpointEngine
+
+    __all__ += ["ECCLCheckpointEngine"]
+except ImportError as e:
+    CheckpointEngineRegistry.record_import_error("eccl_checkpoint_engine", e)
+    ECCLCheckpointEngine = None
 
 try:
     from .nixl_checkpoint_engine import NIXLCheckpointEngine

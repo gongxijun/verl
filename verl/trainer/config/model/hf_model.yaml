@@ -57,6 +57,11 @@ lora_adapter_path: null
 # whether to use liger. Only valid when we use hf model definition
 use_liger: False
 
+# Seed used to re-initialize the value head of a value model (critic) deterministically.
+# Needed on backends whose RNG does not reproduce CUDA initialization across ranks, e.g. Enflame GCU.
+# null keeps the default unseeded initialization; only used when loading a value model.
+value_head_seed: null
+
 # whether to use fused kernels.
 use_fused_kernels: False
 

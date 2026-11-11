@@ -130,7 +130,9 @@ class CheckpointEngineConfig(BaseConfig):
 
     _mutable_fields = {"backend"}
 
-    # Backend for checkpoint engine: naive, nccl, nixl, hccl
+    # Backend for checkpoint engine: naive, nccl, nixl.
+    # The nccl backend name resolves to the vendor collective of the active
+    # platform (NCCL on CUDA, HCCL on Ascend NPU, ECCL on Enflame GCU).
     backend: Optional[str] = "naive"
     # Bucket size in MB to transfer multiple weights at one time
     update_weights_bucket_megabytes: int = 2048

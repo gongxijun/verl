@@ -32,12 +32,14 @@ from torch.utils.data import DistributedSampler
 from torchdata.stateful_dataloader import StatefulDataLoader
 from tqdm import tqdm
 
+from verl.plugin.platform import get_platform
 from verl.utils import tensordict_utils as tu
 from verl.utils.checkpoint import CheckpointHandler, OrchestrationMode
 from verl.utils.dataset.dataset_utils import SFTTensorCollator
 from verl.utils.dataset.multiturn_sft_dataset import MultiTurnSFTDataset
 from verl.utils.device import auto_set_device, get_device_name
 from verl.utils.logger import log_with_rank
+from verl.utils.profiler.tops_runtime import configure_topsprof_runtime_env
 from verl.utils.seqlen_balancing import calculate_workload, get_seqlen_balanced_partitions
 from verl.utils.tracking import Tracking
 from verl.workers.engine_workers import TrainingWorker
@@ -380,7 +382,21 @@ class SFTTrainer:
 
 
 def run_sft(config):
-    ray.init()
+    if not ray.is_initialized():
+        # The platform may need ray.init settings (e.g. Enflame GCU disabling
+        # TOPS_VISIBLE_DEVICES so each worker takes its Ray-assigned device, or the
+        # topsprof runtime-env entry). PPO merges the same hooks in main_ppo.
+        ray_init_kwargs = get_platform().get_ray_init_kwargs()
+        runtime_env = ray_init_kwargs.get("runtime_env") or {}
+        # SFT selects its profiler at `config.profiler` (defaults:
+        # `profiler@profiler: profiler`), not at `config.global_profiler`, so the
+        # tool selector and the `tool_config.topsprof` options come from the same
+        # node. Passing `global_profiler` when a user happens to define one would
+        # make the hook read options from a node SFT never uses.
+        configure_topsprof_runtime_env(config.get("profiler"), runtime_env)
+        if runtime_env:
+            ray_init_kwargs["runtime_env"] = runtime_env
+        ray.init(**ray_init_kwargs)
     trainer = SFTTrainer(config=config)
     trainer.fit()
 

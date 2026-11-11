@@ -19,6 +19,7 @@ We assume package availability won't change during runtime.
 import importlib
 import importlib.util
 import os
+import shutil
 import warnings
 from functools import cache, wraps
 from typing import Optional
@@ -76,6 +77,23 @@ def is_msprobe_available():
     except ModuleNotFoundError:
         msprobe_spec = None
     return msprobe_spec is not None
+
+
+@cache
+def is_topstx_available():
+    """Check whether the Enflame topstx tracing markers are usable."""
+    try:
+        from torch_gcu.gcu import topstx  # noqa: F401
+
+        return True
+    except Exception:
+        return False
+
+
+@cache
+def is_topsprof_available():
+    """Check whether the Enflame ``topsprof`` system profiler is installed."""
+    return shutil.which("topsprof") is not None
 
 
 def import_external_libs(external_libs=None):

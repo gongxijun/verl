@@ -212,6 +212,15 @@ class PlatformBase(abc.ABC):
         else:
             return f"{self.ray_resource_name()}-{device_id}"
 
+    def vllm_min_version(self) -> str:
+        """Return the minimum vLLM version accepted on this platform.
+
+        The default matches the upstream floor in ``verl/third_party/vllm``.
+        Platforms whose vLLM wheel tracks an older release (e.g. Enflame GCU)
+        override this instead of hard-coding vendor checks there.
+        """
+        return "0.18.0"
+
     def apply_model_patches(self, model_type: str) -> None:
         """Apply platform-specific model patches (e.g. replace ops unsupported on this device)."""
         return  # default no-op

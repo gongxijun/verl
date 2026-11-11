@@ -308,6 +308,7 @@ class FSDPEngine(BaseEngine):
                     torch_dtype=torch_dtype,
                     model_config=self.model_config.hf_config,
                     trust_remote_code=self.model_config.trust_remote_code,
+                    value_head_seed=self.model_config.value_head_seed,
                 )
 
             use_liger = self.model_config.use_liger
@@ -1069,7 +1070,7 @@ class EngineTrainModeCtx(BaseEngineCtx):
         super().__exit__(exc_type, exc_value, traceback)
 
 
-@EngineRegistry.register(model_type="language_model", backend=["fsdp", "fsdp2"], device=["cuda", "npu"])
+@EngineRegistry.register(model_type="language_model", backend=["fsdp", "fsdp2"], device=["cuda", "npu", "gcu"])
 class FSDPEngineWithLMHead(FSDPEngine):
     def prepare_model_inputs(self, micro_batch: TensorDict):
         distillation_use_topk = tu.get_non_tensor_data(data=micro_batch, key="distillation_use_topk", default=False)
@@ -1549,7 +1550,7 @@ class FSDPEngineWithLMHead(FSDPEngine):
             return loss, output
 
 
-@EngineRegistry.register(model_type="value_model", backend=["fsdp", "fsdp2"], device=["cuda", "npu"])
+@EngineRegistry.register(model_type="value_model", backend=["fsdp", "fsdp2"], device=["cuda", "npu", "gcu"])
 class FSDPEngineWithValueHead(FSDPEngineWithLMHead):
     """
     The only difference between critic and actor is how the raw model output is processed

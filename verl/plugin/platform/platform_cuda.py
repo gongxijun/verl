@@ -41,6 +41,16 @@ class PlatformCUDA(PlatformBase):
     def is_platform_available(self, use_smi_check=False) -> bool:
         if not hasattr(torch, "cuda"):
             return False
+        # On Enflame GCU, torch_gcu registers a PrivateUse1 backend ("gcu") and
+        # the CUDA build is not the active runtime device; defer to
+        # PlatformEnflame so that auto-detection does not pick CUDA. Only defer
+        # when a GCU is actually usable: torch_gcu can be importable on a CUDA
+        # host without GCUs, and deferring there would strand the user on the
+        # GCU device type.
+        from verl.utils.device import is_torch_gcu_available
+
+        if is_torch_gcu_available(check_device=True):
+            return False
         # On ROCm, torch.cuda is present too; defer to PlatformROCm so that
         # auto-detection does not pick CUDA on AMD hardware.
         if torch.version.hip is not None:

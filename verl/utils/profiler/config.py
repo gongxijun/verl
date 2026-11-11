@@ -262,6 +262,69 @@ class NPUToolConfig(NsightToolConfig):
 
 
 @dataclass
+class TopsprofOptions(BaseConfig):
+    """Options forwarded to the Enflame ``topsprof`` system profiler.
+
+    The values are written to the ``topsprof`` entry of Ray's runtime env (keys
+    ``enable-activities``, ``export``, ``trace`` and ``export-rawdata``), which
+    the Enflame Ray build maps to the ``topsprof`` command-line flags; verl never
+    runs the binary itself. ``export_rawdata="none"`` means "do not export raw
+    data" and is omitted, and a missing or non-string value falls back to the
+    default instead of being forwarded.
+    """
+
+    enable_activities: str = "kernel"
+    export_visual_profiler: str = "true"
+    trace: str = "true"
+    # "none" disables the raw-data export.
+    export_rawdata: str = "none"
+    name: str = "topsprof_options"
+
+    def __post_init__(self) -> None:
+        for field_name in ("enable_activities", "export_visual_profiler", "trace", "export_rawdata"):
+            value = getattr(self, field_name)
+            assert isinstance(value, str), f"{field_name} must be str, got {type(value)}"
+
+
+@dataclass
+class TopsToolConfig(NsightToolConfig):
+    """Enflame GCU ``topsprof`` tool config.
+
+    Recording is driven by the ``TOPSPTI_AUTO_DUMP``/``TOPSPTI_HANDLE_SIGNAL``
+    environment variables, injected by ``verl.utils.profiler.tops_runtime``
+    for both the PPO and the SFT entry points; this config only carries
+    the collection options and the usual profiler gates.
+    """
+
+    # options: gcu, cpu, memory, shapes, module, stack
+    contents: list[str] = field(default_factory=list)
+    # Start collecting profiler data from this response-token index.
+    profile_token_start: Optional[int] = None
+    # Stop collecting profiler data at this response-token index (exclusive).
+    profile_token_end: Optional[int] = None
+    topsprof_options: TopsprofOptions = field(default_factory=TopsprofOptions)
+
+    name: str = "topsprof"
+
+    def __post_init__(self) -> None:
+        """config validation logics go here"""
+        __support_contents = ["gcu", "cpu", "memory", "shapes", "module", "stack"]
+        assert isinstance(self.contents, list), f"Profiler contents must be of type list, got {type(self.contents)}"
+        for content in self.contents:
+            assert content in __support_contents, (
+                f"Profiler contents only supports {__support_contents}, but gets {content}"
+            )
+        start = self.profile_token_start
+        stop = self.profile_token_end
+        for field_name, value in (("profile_token_start", start), ("profile_token_end", stop)):
+            if value is not None:
+                assert isinstance(value, int), f"{field_name} must be int or None, got {type(value)}"
+                assert value >= 0, f"{field_name} must be >= 0, got {value}"
+        if start is not None and stop is not None:
+            assert stop > start, f"profile_token_end must be > profile_token_start, got start={start}, stop={stop}"
+
+
+@dataclass
 class ProfilerConfig(BaseConfig):
     """Worker profiler config.
 

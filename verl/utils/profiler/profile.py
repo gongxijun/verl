@@ -91,6 +91,7 @@ class DistProfiler:
     Supported tools:
     - nsys: NsightSystemsProfiler
     - npu: NPUProfiler (Ascend)
+    - topsprof: TopsProfiler (Enflame GCU)
     - torch: PyTorch torch.profiler wrapper
     - torch_memory: Torch CUDA/NPU memory snapshot dump
     - precision_debugger: msprobe precision debugger
@@ -161,6 +162,38 @@ class DistProfiler:
             from .mstx_profile import NPUProfiler as _Npu
 
             self._impl = _Npu(rank=rank, config=config, tool_config=tool_config, **kwargs)
+        elif self._tool == "topsprof":
+            from verl.plugin.platform import get_platform
+            from verl.utils.import_utils import is_topsprof_available, is_topstx_available
+
+            # topstx_profile imports torch_gcu at module scope. Give an actionable
+            # error instead of a bare ModuleNotFoundError, and don't fail configs
+            # that merely carry tool=topsprof while profiling is disabled. The
+            # platform is checked as well as the import: a CUDA or NPU host can
+            # import torch_gcu (a shared image, a stale install) without topstx
+            # being usable there.
+            if get_platform().device_name != "gcu" or not is_topstx_available():
+                if self._enable:
+                    raise RuntimeError(
+                        "profiler tool 'topsprof' requires the Enflame GCU platform and its "
+                        "topstx runtime (torch_gcu with the TOPS runtime loaded). Run on a GCU "
+                        "host, or set a different profiler tool / disable the profiler."
+                    )
+                logger.warning(
+                    "profiler tool 'topsprof' is unavailable on the %r platform (it requires GCU "
+                    "with the topstx runtime); profiling disabled.",
+                    get_platform().device_name,
+                )
+                self._impl = _NoOpProfiler()
+            else:
+                if self._enable and not is_topsprof_available():
+                    logger.warning(
+                        "The `topsprof` binary was not found on PATH; topstx ranges will still be "
+                        "emitted, but no profile will be exported. Add the TOPS toolchain to PATH."
+                    )
+                from .topstx_profile import TopsProfiler
+
+                self._impl = TopsProfiler(rank=rank, config=config, tool_config=tool_config, **kwargs)
         elif self._tool == "torch":
             from .torch_profile import Profiler as _Torch
 

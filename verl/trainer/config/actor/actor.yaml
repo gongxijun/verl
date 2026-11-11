@@ -173,7 +173,7 @@ profiler:
   _target_: verl.utils.profiler.ProfilerConfig
 
   # profiler tool, default same as profiler.tool in global config
-  # choices: nsys, npu, torch
+  # choices: nsys, npu, topsprof, torch
   tool: ${oc.select:global_profiler.tool,null}
 
   # whether enable profile on Actor
@@ -238,7 +238,7 @@ profiler:
 
       # True for each task has its own database, False for all tasks in one training step share one database.
       discrete: False
-    
+
     # torch profiler config
     torch:
 

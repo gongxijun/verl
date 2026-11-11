@@ -323,7 +323,7 @@ global_profiler:
   # Required when using verl.utils.omega_conf_to_dataclass to instantiate dataclass configs
   _target_: verl.utils.profiler.ProfilerConfig
 
-  # Profiling tool: choose between nsys, npu, torch, torch_memory, precision_debugger
+  # Profiling tool: choose between nsys, npu, topsprof, torch, torch_memory, precision_debugger
   tool: null
 
   # profile steps
@@ -412,6 +412,35 @@ global_profiler:
 
         # Send signal to the target application's process group. We let the program to exit by itself.
         kill: none
+
+    # Enflame GCU topsprof config. Selecting tool=topsprof makes the trainer inject the
+    # TOPSPTI_* env vars and this block as the `topsprof` Ray runtime-env entry, which the
+    # Enflame Ray build turns into topsprof CLI flags for every worker.
+    topsprof:
+
+      # Required when using verl.utils.omega_conf_to_dataclass to instantiate dataclass configs
+      _target_: verl.utils.profiler.config.TopsToolConfig
+
+      # True for each task has its own database, False for all tasks in one training step share one database.
+      discrete: False
+
+      # Placed in the `topsprof` Ray runtime-env entry (see the block comment above).
+      topsprof_options:
+
+        # Required when using verl.utils.omega_conf_to_dataclass to instantiate dataclass configs
+        _target_: verl.utils.profiler.config.TopsprofOptions
+
+        # topsprof --enable-activities
+        enable_activities: "kernel"
+
+        # topsprof --export
+        export_visual_profiler: "true"
+
+        # topsprof --trace
+        trace: "true"
+
+        # topsprof --export-rawdata; "none" disables raw-data export.
+        export_rawdata: "none"
 
     # Enable memory visualization and automatic CUDA/NPU OOM snapshots for debugging memory usage.
     torch_memory:

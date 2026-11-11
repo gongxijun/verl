@@ -427,6 +427,7 @@ actor_rollout_ref:
     exclude_modules: null
     lora_adapter_path: null
     use_liger: false
+    value_head_seed: null
     use_fused_kernels: false
     fused_kernel_options:
       impl_backend: torch
@@ -659,6 +660,7 @@ critic:
     exclude_modules: null
     lora_adapter_path: null
     use_liger: false
+    value_head_seed: null
     use_fused_kernels: false
     fused_kernel_options:
       impl_backend: torch
@@ -1001,6 +1003,15 @@ global_profiler:
         capture-range: cudaProfilerApi
         capture-range-end: null
         kill: none
+    topsprof:
+      _target_: verl.utils.profiler.config.TopsToolConfig
+      discrete: false
+      topsprof_options:
+        _target_: verl.utils.profiler.config.TopsprofOptions
+        enable_activities: kernel
+        export_visual_profiler: 'true'
+        trace: 'true'
+        export_rawdata: none
     torch_memory:
       trace_alloc_max_entries: 100000
       stack_depth: 32

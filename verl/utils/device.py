@@ -62,6 +62,37 @@ is_cuda_available = torch.cuda.is_available()
 is_npu_available = is_torch_npu_available()
 
 
+def is_torch_gcu_available(check_device=True) -> bool:
+    """Check if Enflame GCU is available for PyTorch operations.
+
+    Mirrors :func:`is_torch_npu_available`: importing ``torch_gcu`` registers the
+    ``torch.gcu`` device module, which is then probed unless ``check_device`` is
+    False.
+
+    Args:
+        check_device: only check the ``torch_gcu`` package or strictly check if a
+            GCU device is available.
+
+    Returns:
+        bool: True if GCU is available, False otherwise.
+    """
+    try:
+        if not hasattr(torch, "gcu"):
+            import torch_gcu  # noqa: F401
+
+        if not hasattr(torch, "gcu"):
+            return False
+
+        if check_device:
+            return torch.gcu.is_available()
+        return True
+    except Exception:
+        return False
+
+
+is_gcu_available = is_torch_gcu_available()
+
+
 def get_resource_name() -> str:
     """Function that return ray resource name based on the device type.
     Returns:

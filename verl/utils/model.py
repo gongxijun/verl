@@ -464,7 +464,57 @@ def patch_valuehead_model(model) -> None:
     model._no_split_modules = getattr(model.pretrained_model, "_no_split_modules", [])
 
 
-def load_valuehead_model(local_path, torch_dtype, model_config, trust_remote_code):
+_VALUEHEAD_INIT_STD = 0.02
+
+
+def _init_valuehead_parameters(head: torch.nn.Module, model_config, value_head_seed: int) -> None:
+    """Overwrite a value head with a seed-controlled initialization.
+
+    Vendor backends whose RNG is not seeded identically to CUDA (e.g. Enflame GCU)
+    can otherwise create a different value head on every rank, which makes
+    resumes and multi-rank runs irreproducible.
+
+    Every parameter of the head is covered, not only its ``weight``: leaving the
+    bias unseeded would make the head rank-dependent again.
+
+    Args:
+        head: The value-head module to re-initialize in place.
+        model_config: The HF model config, read for ``initializer_range``.
+        value_head_seed: The integer seed of the initialization.
+    """
+    std = getattr(model_config, "initializer_range", _VALUEHEAD_INIT_STD)
+    generator = torch.Generator(device="cpu")
+    generator.manual_seed(value_head_seed)
+    # Sorted iteration makes the generator consumption order independent of the
+    # module's registration order.
+    for name, parameter in sorted(head.named_parameters()):
+        init = torch.zeros(parameter.shape, dtype=parameter.dtype, device="cpu")
+        if not name.endswith("bias"):
+            init.normal_(mean=0.0, std=std, generator=generator)
+        parameter.data.copy_(init)
+
+
+def _get_valuehead_module(model, candidates: tuple[str, ...]) -> torch.nn.Module:
+    """Return the first value-head module found under ``candidates``."""
+    for name in candidates:
+        head = getattr(model, name, None)
+        if isinstance(head, torch.nn.Module) and any(True for _ in head.parameters()):
+            return head
+    attrs = " / ".join(f"`{name}`" for name in candidates)
+    raise RuntimeError(f"cannot apply value_head_seed: {type(model).__name__} exposes none of {attrs}")
+
+
+def load_valuehead_model(local_path, torch_dtype, model_config, trust_remote_code, value_head_seed: int | None = None):
+    """Load a model with a value head.
+
+    Args:
+        value_head_seed: If set, re-initialize the value head with this seed so the
+            result is identical across ranks and runs. ``None`` keeps the default
+            (unseeded) random initialization.
+    """
+    if value_head_seed is not None and (isinstance(value_head_seed, bool) or not isinstance(value_head_seed, int)):
+        raise TypeError(f"value_head_seed must be an int or None, got {type(value_head_seed).__name__}")
+
     from transformers import AutoModelForCausalLM, AutoModelForTokenClassification
 
     try:
@@ -475,12 +525,16 @@ def load_valuehead_model(local_path, torch_dtype, model_config, trust_remote_cod
             attn_implementation="flash_attention_2",
             trust_remote_code=trust_remote_code,
         )
-        return model
     except BaseException as e:
         if not is_trl_available():
             raise RuntimeError(
                 f"model({local_path}) is not a value head model, please install trl to make it valid"
             ) from e
+    else:
+        if value_head_seed is not None:
+            head = _get_valuehead_module(model, ("score", "classifier"))
+            _init_valuehead_parameters(head, model_config, value_head_seed)
+        return model
 
     assert is_trl_available()
 
@@ -504,6 +558,11 @@ def load_valuehead_model(local_path, torch_dtype, model_config, trust_remote_cod
     if hasattr(model_config, "text_config"):
         ori_model.config.hidden_size = model_config.text_config.hidden_size
     model = AutoModelForCausalLMWithValueHead.from_pretrained(ori_model)
+    if value_head_seed is not None:
+        value_head = getattr(getattr(model, "v_head", None), "summary", None)
+        if not isinstance(value_head, torch.nn.Module):
+            raise RuntimeError(f"cannot apply value_head_seed: {type(model).__name__} has no `v_head.summary` module")
+        _init_valuehead_parameters(value_head, model_config, value_head_seed)
     patch_valuehead_model(model)
     return model
 

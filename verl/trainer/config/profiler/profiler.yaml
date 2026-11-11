@@ -2,7 +2,7 @@
 _target_: verl.utils.profiler.ProfilerConfig
 
 # profiler tool, default same as profiler.tool in global config
-# choices: nsys, npu, torch
+# choices: nsys, npu, topsprof, torch, torch_memory, precision_debugger
 tool: torch
 
 # whether enable profile on Actor
@@ -77,6 +77,39 @@ tool_config:
     discrete: ${oc.select:global_profiler.global_tool_config.nsys.discrete}
 
     name: nsight
+
+  topsprof:
+    # Required when using verl.utils.omega_conf_to_dataclass to instantiate dataclass configs
+    _target_: verl.utils.profiler.config.TopsToolConfig
+
+    # Contents to profile, can be empty
+    # options: gcu, cpu, memory, shapes, module, stack
+    contents: [ ]
+
+    # True for each task has its own database, False for all tasks in one training step share one database.
+    discrete: False
+
+    # Start collecting profiler data from this response-token index.
+    # null means collect from the first response token (full collection start).
+    profile_token_start: null
+
+    # Stop collecting profiler data at this response-token index (exclusive).
+    # null means collect until the end (full collection).
+    profile_token_end: null
+
+    # Placed in the `topsprof` Ray runtime-env entry, which the Enflame Ray build turns
+    # into topsprof CLI flags. See the GCU toolchain docs.
+    topsprof_options:
+      # Required when using verl.utils.omega_conf_to_dataclass to instantiate dataclass configs
+      _target_: verl.utils.profiler.config.TopsprofOptions
+
+      enable_activities: "kernel"
+      export_visual_profiler: "true"
+      trace: "true"
+      export_rawdata: "none"
+      name: topsprof_options
+
+    name: topsprof
 
   torch:
     # Required when using verl.utils.omega_conf_to_dataclass to instantiate dataclass configs

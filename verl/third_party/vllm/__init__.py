@@ -16,6 +16,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from packaging import version as vs
 
+from verl.plugin.platform import get_platform
 from verl.utils.device import is_npu_available
 from verl.utils.import_utils import is_sglang_available
 
@@ -32,18 +33,23 @@ package_version = get_version(package_name)
 vllm_version = None
 VLLM_SLEEP_LEVEL = 1
 
+# The floor is platform-provided: a vendor whose vLLM wheel tracks an older
+# upstream release (e.g. Enflame GCU) overrides it instead of being special-cased
+# here. The default remains the upstream floor.
+VLLM_MIN_VERSION = get_platform().vllm_min_version()
+
 if package_version is None:
     if not is_sglang_available():
         raise ValueError(
             f"vllm version {package_version} not supported and SGLang also not Found. Currently supported "
-            f"vllm versions are 0.18.0+"
+            f"vllm versions are {VLLM_MIN_VERSION}+"
         )
 elif is_npu_available:
     # sleep_mode=2 is not supported on vllm-ascend for now, will remove this restriction when this ability is ready.
     VLLM_SLEEP_LEVEL = 1
     from vllm import LLM
     from vllm.distributed import parallel_state
-elif vs.parse(package_version) >= vs.parse("0.18.0"):
+elif vs.parse(package_version) >= vs.parse(VLLM_MIN_VERSION):
     vllm_version = package_version
     VLLM_SLEEP_LEVEL = 2
     from vllm import LLM
@@ -54,7 +60,7 @@ else:
     if not is_sglang_available():
         raise ValueError(
             f"vllm version {package_version} not supported and SGLang also not Found. Currently supported "
-            f"vllm versions are 0.18.0+"
+            f"vllm versions are {VLLM_MIN_VERSION}+"
         )
 
 __all__ = ["LLM", "parallel_state"]

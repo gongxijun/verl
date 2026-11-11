@@ -22,6 +22,8 @@ Hardware Support
 
 - NVIDIA GPU (CUDA)
 - Huawei Ascend NPU
+- Enflame GCU (FSDP/FSDP2 training + vLLM rollout; see
+  :doc:`the Enflame tutorial <../enflame_backend/index>`)
 
 **Via verl-hardware-plugin (reference implementations):**
 
@@ -81,6 +83,7 @@ Architecture Overview
     |  |  PlatformRegistry                                        |      |
     |  |    ├─ "nvidia"    → PlatformCUDA      (built-in)         |      |
     |  |    ├─ "huawei"    → PlatformNPU       (built-in)         |      |
+    |  |    ├─ "enflame"   → PlatformEnflame   (built-in)         |      |
     |  |    ├─ "intel"     → PlatformXPU       (plugin)           |      |
     |  |    ├─ "cambricon" → PlatformMLU       (plugin)           |      |
     |  |    ├─ "metax"     → PlatformMetaX     (plugin)           |      |
@@ -96,6 +99,7 @@ Architecture Overview
     |  |       |                                                  |      |
     |  |       +-- ("cuda", None)     → FSDPEngineWithLMHead      |      |
     |  |       +-- ("npu", None)      → FSDPNPUEngineWithLMHead   |      |
+    |  |       +-- ("gcu", None)      → FSDPEngineWithLMHead      |      |
     |  |       +-- ("cuda", "metax")  → FSDPMetaXEngineWithLMHead |      |
     |  |       +-- ("xpu", "intel")   → FSDPXPUEngineWithLMHead   |      |
     |  |       +-- ("mlu","cambricon")→ FSDPMLUEngineWithLMHead   |      |

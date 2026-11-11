@@ -32,6 +32,7 @@ from verl.utils.config import validate_config
 from verl.utils.device import auto_set_device, is_cuda_available
 from verl.utils.import_utils import load_class_from_fqn
 from verl.utils.logging_utils import configure_verl_logging
+from verl.utils.profiler.tops_runtime import configure_topsprof_runtime_env
 
 logger = logging.getLogger(__name__)
 logger.setLevel(os.getenv("VERL_LOGGING_LEVEL", "INFO"))
@@ -76,6 +77,11 @@ def run_ppo(config, task_runner_class) -> None:
             # Set this on the defaults, not on ray_init.runtime_env: the latter is a struct
             # DictConfig, so adding an `env_vars` key to it raises ConfigKeyError.
             default_runtime_env.setdefault("env_vars", {})["TRANSFER_QUEUE_ENABLE"] = "1"
+
+        # Enflame GCU topsprof: recording is driven by TOPSPTI_* env vars, and the CLI
+        # options are forwarded through the `topsprof` runtime env entry. Gated on the
+        # active platform so a shared config with tool=topsprof cannot affect CUDA hosts.
+        configure_topsprof_runtime_env(config.global_profiler, default_runtime_env)
 
         # Platform settings (e.g. TPU's worker_process_setup_hook) sit between verl's defaults and the
         # user's ray_kwargs.ray_init.runtime_env, so the user's config wins on conflicts.

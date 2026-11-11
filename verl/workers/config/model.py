@@ -135,6 +135,11 @@ class HFModelConfig(BaseConfig):
     lora_adapter_path: Optional[str] = None
     use_liger: bool = False
 
+    # Seed used to re-initialize the value head of a value model (critic) deterministically.
+    # Required on backends whose RNG does not reproduce CUDA initialization across ranks
+    # (e.g. Enflame GCU). None keeps the default unseeded initialization.
+    value_head_seed: Optional[int] = None
+
     use_fused_kernels: bool = False
     fused_kernel_options: dict = field(default_factory=dict)
 
